@@ -1,7 +1,8 @@
 module pipe_intr_cu_fpu (func,op,op1,rs,rt,rd,mrn,mm2reg,mwreg,ern,em2reg,ewreg,rsrtequ,pcsource,wpcir,wreg,m2reg,wmem,jal,aluc,aluimm,
                     shift,sext,regrt,fwda,fwdb,intr,inta,sta,ov,misbr,eisbr,ecancel,earith,arith,cancel,isbr,mfc0,wsta,wcau,wepc,mtc0,
                     cause,selepc,selpc,exc,fs,ft,e1n,e2n,e3n,ewfpr,mwfpr,e1w,e2w,e3w,stall_div_sqrt,st,fwdla,fwdlb,fwdfa,fwdfb,fc,
-                    swfp,fwdf,fwdfe,wfpr,wf,fasmds,stall_lw,stall_fp,stall_lwc1,stall_swc1);
+                    swfp,fwdf,fwdfe,wfpr,wf,fasmds,stall_lw,stall_fp,stall_lwc1,stall_swc1,pre_taken,pre_bjpc_is_right,pre_fch_wrong,
+                    ud_BTB,ud_pdt);
 	input [31:0] sta;
     input [5:0] func,op;
 	input [4:0] rs,rt,rd,mrn,ern,op1;
@@ -25,6 +26,12 @@ module pipe_intr_cu_fpu (func,op,op1,rs,rt,rd,mrn,mm2reg,mwreg,ern,em2reg,ewreg,
     output swfp,fwdf,fwdfe;
     output wfpr,wf,fasmds;
     output stall_lw,stall_fp,stall_lwc1,stall_swc1;
+
+    //input(output) signals from(to) predictor
+    input pre_taken;
+    input pre_bjpc_is_right;
+    output pre_fch_wrong;
+    output ud_BTB,ud_pdt;
 	
 	wire rtype,i_add,i_sub,i_and,i_or,i_xor,i_sll,i_srl,i_sra,i_jr;
 	wire i_addi,i_andi,i_ori,i_xori,i_lw,i_sw,i_beq,i_bne,i_lui,i_j,i_jal;
@@ -130,8 +137,18 @@ module pipe_intr_cu_fpu (func,op,op1,rs,rt,rd,mrn,mm2reg,mwreg,ern,em2reg,ewreg,
 	assign aluc[1]=i_xor|i_sll|i_srl|i_sra|i_xori|i_beq|i_bne|i_lui;
 	assign aluc[0]=i_and|i_or|i_sll|i_srl|i_sra|i_andi|i_ori;
 	assign wmem=(i_sw|i_swc1)&wpcir&~ecancel&~exc_ovr;
+    wire real_br_taken=i_bne&~rsrtequ|i_beq&rsrtequ;
 	assign pcsource[1]=i_j|i_jal|i_jr;
-	assign pcsource[0]=i_j|i_jal|i_bne&~rsrtequ|i_beq&rsrtequ;
+	assign pcsource[0]=i_j|i_jal|real_br_taken;
+
+    //refetch pc (because of the prefetch is wrong)
+    wire i_jump_inst=i_jal|i_jr|i_j;
+    wire i_branch_inst=i_bne|i_beq;
+    wire jump_is_wrong=i_jump_inst&!pre_bjpc_is_right;
+    wire branch_is_wrong=i_branch_inst&((pre_taken^real_br_taken)|(!pre_bjpc_is_right));
+    assign pre_fch_wrong=jump_is_wrong|branch_is_wrong;
+    assign ud_BTB=i_jump_inst|i_branch_inst;
+    assign ud_pdt=i_branch_inst;
 
     //FPU control signals
     wire [2:0] fop;

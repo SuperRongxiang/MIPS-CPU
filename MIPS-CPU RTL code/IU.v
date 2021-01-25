@@ -11,20 +11,24 @@ module IU   (e1n,e2n,e3n,e1w,e2w,e3w,stall_div_sqrt,st,dfb,e3d,clk,mem_clk,rst_n
     output stall_lw,stall_fp,stall_lwc1,stall_swc1;
 
 	//---------------------------------------//
-	wire [31:0] next_pc,bpc,jpc,da,int_inst,inst,pc4,epc;
+	wire [31:0] next_pc,bpc,jpc,da,int_inst,inst,pc4,epc,pcd,pre_bjpc_if,real_bjpc;
 	wire [1:0] pcsource,selpc;
-	wire wpcir;
+	wire wpcir,pre_taken_if,pre_fch_wrong,ud_BTB,ud_pdt;
 	pipe_intr_PC_reg PC_reg	(.clk(clk),.rst_n(rst_n),.wpcir(wpcir),.PC_in(next_pc),.PC_out(pc));
-	pipe_intr_IF_stage_fpu IF_stage 	(.pc(pc),.bpc(bpc),.da(da),.jpc(jpc),.epc(epc),.selpc(selpc),.pcsource(pcsource),.inst(int_inst),.pc4(pc4),.next_pc(next_pc));
+	pipe_intr_IF_stage_fpu IF_stage 	(.pc(pc),.bpc(bpc),.da(da),.jpc(jpc),.epc(epc),.selpc(selpc),.pcsource(pcsource),.inst(int_inst),.pc4(pc4),.next_pc(next_pc),
+										.pre_taken(pre_taken_if),.pre_bjpc(pre_bjpc_if),.clk(clk),.rst_n(rst_n),
+										.pre_fch_wrong(pre_fch_wrong),.ud_BTB(ud_BTB),.ud_pdt(ud_pdt),.pc_id(pcd),.real_bjpc(real_bjpc));
 
 	//--------------------------------------//
-	wire [31:0] id_pc4,id_inst,wdi,ealu,malu,mmo,id2reg_pc4,db,imm,pcd,pce,pcm,sta_in,cau_in,epc_in,sta;
+	wire [31:0] id_pc4,id_inst,wdi,ealu,malu,mmo,id2reg_pc4,db,imm,pce,pcm,sta_in,cau_in,epc_in,sta,pre_bjpc_id;
 	wire [4:0] wrn,mrn,drn,ern;
 	wire [3:0] aluc;
 	wire [1:0] mfc0;
 	wire wwreg,em2reg,ewreg,mm2reg,mwreg,wreg,m2reg,wmem,jal,shift,aluimm,isbr,misbr,eisbr,ecancel,earith,arith,cancel,wsta,wcau,wepc,ov;
 	wire fwdfe,wfpr,efwdfe,ewfpr;
-	pipe_intr_IR_reg IR_reg 	(.inst_in(int_inst),.pc4_in(pc4),.clk(clk),.rst_n(rst_n),.wpcir(wpcir),.pc4_out(id_pc4),.inst_out(inst),.pc(pc),.pcd(pcd));
+	wire pre_taken_id;
+	pipe_intr_IR_reg_fpu IR_reg 	(.inst_in(int_inst),.pc4_in(pc4),.clk(clk),.rst_n(rst_n),.wpcir(wpcir),.pc4_out(id_pc4),.inst_out(inst),.pc(pc),.pcd(pcd),
+									.pre_taken_if(pre_taken_if),.pre_taken_id(pre_taken_id),.pre_bjpc_if(pre_bjpc_if),.pre_bjpc_id(pre_bjpc_id));
 	pipe_intr_ID_stage_fpu ID_stage 	(.clk(clk),.rst_n(rst_n),.inst(inst),.pc4_in(id_pc4),.wdi(wdi),.wrn(wrn),.ealu(ealu),.malu(malu),.mmo(mmo),
 							.wwreg(wwreg),.ern(ern),.em2reg(em2reg),.ewreg(ewreg),.mrn(mrn),.mm2reg(mm2reg),.mwreg(mwreg),.wreg(wreg),.m2reg(m2reg),
 							.wmem(wmem),.jal(jal),.aluc(aluc),.aluimm(aluimm),.shift(shift),.pc4_out(id2reg_pc4),.da(da),.dd(db),.ext_imm(imm),
@@ -34,7 +38,8 @@ module IU   (e1n,e2n,e3n,e1w,e2w,e3w,stall_div_sqrt,st,dfb,e3d,clk,mem_clk,rst_n
 							.selpc(selpc),.e1n(e1n),.e2n(e2n),.e3n(e3n),.e1w(e1w),.e2w(e2w),.e3w(e3w),.stall_div_sqrt(stall_div_sqrt),
 							.fwdla(fwdla),.fwdlb(fwdlb),.fwdfa(fwdfa),.fwdfb(fwdfb),.fc(fc),.fwdfe(fwdfe),.wfpr(wfpr),.wf(wf),.fasmds(fasmds),
 							.stall_lw(stall_lw),.stall_fp(stall_fp),.stall_lwc1(stall_lwc1),.stall_swc1(stall_swc1),.st(st),.dfb(dfb),.e3d(e3d),
-							.ewfpr(ewfpr),.mwfpr(mwfpr),.fs(fs),.ft(ft),.fd(fd));
+							.ewfpr(ewfpr),.mwfpr(mwfpr),.fs(fs),.ft(ft),.fd(fd),.pre_bjpc(pre_bjpc_id),.pre_taken(pre_taken_id),.ud_BTB(ud_BTB),
+							.ud_pdt(ud_pdt),.pre_fch_wrong(pre_fch_wrong),.real_bjpc(real_bjpc));
 
 	//--------------------------------------//
 	wire ewmem,ealuimm,eshift,ejal,ewreg0;

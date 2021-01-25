@@ -3,7 +3,8 @@ module pipe_intr_ID_stage_fpu   (clk,rst_n,inst,pc4_in,wdi,wrn,ealu,malu,mmo,wwr
                             intr,inta,isbr,misbr,eisbr,ecancel,earith,arith,cancel,mfc0,wsta,wcau,wepc,pc,pcd,pce,
                             pcm,sta_in,cau_in,epc_in,sta,ov,selpc,e1n,e2n,e3n,e1w,e2w,e3w,stall_div_sqrt,fwdla,fwdlb,
 							fwdfa,fwdfb,fc,fwdfe,wfpr,wf,fasmds,stall_lw,stall_fp,stall_lwc1,stall_swc1,st,dfb,e3d,ewfpr,mwfpr,
-							fs,ft,fd);
+							fs,ft,fd,
+							pre_bjpc,pre_taken,ud_BTB,ud_pdt,pre_fch_wrong,real_bjpc);
 	input clk,rst_n;
 	input [31:0] inst,pc4_in,ealu,malu,mmo,pc,pcd,pce,pcm,wdi,sta;
 	input mm2reg,mwreg,em2reg,ewreg,wwreg,intr,misbr,eisbr,ecancel,earith,ov;
@@ -38,6 +39,12 @@ module pipe_intr_ID_stage_fpu   (clk,rst_n,inst,pc4_in,wdi,wrn,ealu,malu,mmo,wwr
 	//multithread related
 	input st;
 
+	//input(output) from(to) branch predictor
+	input [31:0] pre_bjpc;
+	input pre_taken;
+	output ud_BTB,ud_pdt,pre_fch_wrong;
+	output [31:0] real_bjpc;
+
 	//instruction decode
 	wire [5:0] op,func;
 	wire [4:0] fs,ft,fd;
@@ -69,6 +76,11 @@ module pipe_intr_ID_stage_fpu   (clk,rst_n,inst,pc4_in,wdi,wrn,ealu,malu,mmo,wwr
 	wire [31:0] offset={ext_imm[29:0],2'b00};
 	assign jpc={pc4[31:28],address,2'b00};
 	addsub32 form_bpc (.a(pc4),.b(offset),.sub(1'b0),.r(bpc));
+
+	//comparison of predicted target pc and real target pc
+	wire [31:0] real_bjpc;
+	mux4x32 selnpc (.data1(pc4),.data2(bpc),.data3(da),.data4(jpc),.sel(pcsource),.dataout(real_bjpc));
+	wire pre_bjpc_is_right=~|(real_bjpc^pre_bjpc);
 
 	//extend imm
 	imm_extend imm_extention(.imm(imm),.sel_ext(sext),.ext_imm(ext_imm));
@@ -122,7 +134,8 @@ module pipe_intr_ID_stage_fpu   (clk,rst_n,inst,pc4_in,wdi,wrn,ealu,malu,mmo,wwr
 									.mwfpr(mwfpr),.e1w(e1w),.e2w(e2w),.e3w(e3w),.stall_div_sqrt(stall_div_sqrt),.st(st),.fwdla(fwdla),
 									.fwdlb(fwdlb),.fwdfa(fwdfa),.fwdfb(fwdfb),.fc(fc),.swfp(swfp),.fwdf(fwdf),.fwdfe(fwdfe),.wfpr(wfpr),
 									.wf(wf),.fasmds(fasmds),.stall_lw(stall_lw),.stall_fp(stall_fp),.stall_lwc1(stall_lwc1),
-									.stall_swc1(stall_swc1));
+									.stall_swc1(stall_swc1),.pre_taken(pre_taken),.pre_bjpc_is_right(pre_bjpc_is_right),
+									.pre_fch_wrong(pre_fch_wrong),.ud_BTB(ud_BTB),.ud_pdt(ud_pdt));
 	
 	//transfer the pc4
 	assign pc4_out=pc4_in;
